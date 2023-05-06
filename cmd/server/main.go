@@ -4,11 +4,13 @@ import (
 	"errors"
 	"log"
 	"net/http"
+
+	"github.com/rekby-tmp/mymetrics/internal/server"
 )
 
 func main() {
-	server := NewServer("localhost:8080", NewMemStorage())
-	err := server.Start()
+	s := server.NewServer("localhost:8080", server.NewMemStorage())
+	err := s.Start()
 	if !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
