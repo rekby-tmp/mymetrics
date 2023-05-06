@@ -20,7 +20,7 @@ func NewServer(endpoint string, storage Storage) *Server {
 		endpoint: endpoint,
 		storage:  storage,
 	}
-	s.mux.HandleFunc("/update/gauge/", s.updateHandler)
+	s.mux.HandleFunc("/update/", s.updateHandler)
 	s.server = &http.Server{
 		Addr:    s.endpoint,
 		Handler: &s.mux,
