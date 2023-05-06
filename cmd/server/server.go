@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,6 +12,7 @@ type Server struct {
 	endpoint string
 	storage  Storage
 	mux      http.ServeMux
+	server   *http.Server
 }
 
 func NewServer(endpoint string, storage Storage) *Server {
@@ -18,17 +20,21 @@ func NewServer(endpoint string, storage Storage) *Server {
 		endpoint: endpoint,
 		storage:  storage,
 	}
-	s.mux.HandleFunc("/update/counter/", s.handleGauge)
+	s.mux.HandleFunc("/update/counter/", s.handleCounter)
 	s.mux.HandleFunc("/update/gauge/", s.handleGauge)
+	s.server = &http.Server{
+		Addr:    s.endpoint,
+		Handler: &s.mux,
+	}
 	return s
 }
 
 func (s *Server) Start() error {
-	httpServer := http.Server{
-		Addr:    s.endpoint,
-		Handler: &s.mux,
-	}
-	return httpServer.ListenAndServe()
+	return s.server.ListenAndServe()
+}
+
+func (s *Server) Shutdown(ctx context.Context) error {
+	return s.server.Shutdown(ctx)
 }
 
 func (s *Server) handleCounter(w http.ResponseWriter, r *http.Request) {
@@ -39,17 +45,21 @@ func (s *Server) handleCounter(w http.ResponseWriter, r *http.Request) {
 
 	name, valS, err := getMetricNameValue(r)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Get metric value error: %w", err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("Get metric value error: %v", err), http.StatusBadRequest)
 		return
 	}
 
 	val, err := strconv.ParseInt(valS, 10, 64)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Parse int value error: %w", err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("Parse int value error: %v", err), http.StatusBadRequest)
 		return
 	}
 
-	s.storage.StoreCounter(name, val)
+	err = s.storage.StoreCounter(name, val)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to store counter value: %v", err), http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -61,17 +71,21 @@ func (s *Server) handleGauge(w http.ResponseWriter, r *http.Request) {
 
 	name, valS, err := getMetricNameValue(r)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Get metric value error: %w", err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("Get metric value error: %v", err), http.StatusBadRequest)
 		return
 	}
 
 	val, err := strconv.ParseFloat(valS, 64)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Parse float value error: %w", err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("Parse float value error: %v", err), http.StatusBadRequest)
 		return
 	}
 
-	s.storage.StoreGauge(name, val)
+	err = s.storage.StoreGauge(name, val)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to store gauge value: %v", err), http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
