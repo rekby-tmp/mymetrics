@@ -20,8 +20,7 @@ func NewServer(endpoint string, storage Storage) *Server {
 		endpoint: endpoint,
 		storage:  storage,
 	}
-	s.mux.HandleFunc("/update/counter/", s.handleCounter)
-	s.mux.HandleFunc("/update/gauge/", s.handleGauge)
+	s.mux.HandleFunc("/update/gauge/", s.updateHandler)
 	s.server = &http.Server{
 		Addr:    s.endpoint,
 		Handler: &s.mux,
@@ -37,63 +36,56 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
 }
 
-func (s *Server) handleCounter(w http.ResponseWriter, r *http.Request) {
+func (s *Server) updateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, fmt.Sprintf("Unexpected method: %q", r.Method), http.StatusBadRequest)
 		return
 	}
 
-	name, valS, err := getMetricNameValue(r)
+	valType, name, valS, err := getMetricTypeNameValue(r)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Get metric value error: %v", err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("Path not found: %v", err), http.StatusNotFound)
 		return
 	}
 
-	val, err := strconv.ParseInt(valS, 10, 64)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Parse int value error: %v", err), http.StatusBadRequest)
+	switch valType {
+	case "gauge":
+		val, err := strconv.ParseFloat(valS, 64)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Parse float value error: %v", err), http.StatusBadRequest)
+			return
+		}
+		err = s.storage.StoreGauge(name, val)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to store gauge value: %v", err), http.StatusInternalServerError)
+			return
+		}
+	case "counter":
+		val, err := strconv.ParseInt(valS, 10, 64)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Parse float value error: %v", err), http.StatusBadRequest)
+			return
+		}
+		err = s.storage.StoreCounter(name, val)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to store counter value: %v", err), http.StatusInternalServerError)
+			return
+		}
+	default:
+		http.Error(w, fmt.Sprintf("unknown value type: %q", valType), http.StatusBadRequest)
 		return
 	}
 
-	err = s.storage.StoreCounter(name, val)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to store counter value: %v", err), http.StatusInternalServerError)
-		return
-	}
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) handleGauge(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, fmt.Sprintf("Unexpected method: %q", r.Method), http.StatusBadRequest)
-		return
+func getMetricTypeNameValue(r *http.Request) (valType, name, value string, _ error) {
+	path := r.URL.Path
+	path = strings.TrimPrefix(path, "/")
+	parts := strings.Split(path, "/")
+	if len(parts) != 4 {
+		return "", "", "", fmt.Errorf("bad parts in path for extrace metric name and balue: %v", len(parts))
 	}
 
-	name, valS, err := getMetricNameValue(r)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Get metric value error: %v", err), http.StatusBadRequest)
-		return
-	}
-
-	val, err := strconv.ParseFloat(valS, 64)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Parse float value error: %v", err), http.StatusBadRequest)
-		return
-	}
-
-	err = s.storage.StoreGauge(name, val)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to store gauge value: %v", err), http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
-func getMetricNameValue(r *http.Request) (name, value string, _ error) {
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 2 {
-		return "", "", fmt.Errorf("bad parts in path for extrace metric name and balue: %v", len(parts))
-	}
-
-	return parts[len(parts)-2], parts[len(parts)-1], nil
+	return parts[1], parts[2], parts[3], nil
 }
