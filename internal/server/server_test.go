@@ -100,6 +100,7 @@ func TestResponseCodes(t *testing.T) {
 
 			resp := respRec.Result()
 			require.Equal(t, test.respCode, resp.StatusCode)
+			resp.Body.Close()
 		})
 	}
 }
@@ -131,7 +132,7 @@ func TestGetValues(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/value/counter/test-counter", nil)
 		resp := httptest.NewRecorder()
 		s.server.Handler.ServeHTTP(resp, req)
-		require.Equal(t, http.StatusOK, resp.Result().StatusCode)
+		require.Equal(t, http.StatusOK, resp.Code)
 		require.Equal(t, "1", resp.Body.String())
 	})
 
@@ -139,7 +140,7 @@ func TestGetValues(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/value/gauge/test-gauge", nil)
 		resp := httptest.NewRecorder()
 		s.server.Handler.ServeHTTP(resp, req)
-		require.Equal(t, http.StatusOK, resp.Result().StatusCode)
+		require.Equal(t, http.StatusOK, resp.Code)
 		require.Equal(t, "1.5", resp.Body.String())
 	})
 }
