@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
 type Server struct {
@@ -15,20 +16,26 @@ type Server struct {
 	storage  Storage
 	r        *chi.Mux
 	server   *http.Server
+	logger   *zap.Logger
 }
 
-func NewServer(endpoint string, storage Storage) *Server {
+func NewServer(endpoint string, storage Storage, logger *zap.Logger) *Server {
 	s := &Server{
 		Endpoint: endpoint,
 		storage:  storage,
 		r:        chi.NewRouter(),
+		logger:   logger,
 	}
 	s.r.Get("/", s.listMetrics)
 	s.r.Post("/update/{valType}/{name}/{value}", s.updateMetric)
 	s.r.Get("/value/{valType}/{name}", s.getMetric)
+
+	var handler http.Handler = s.r
+	handler = WithLogging(logger, handler)
+
 	s.server = &http.Server{
 		Addr:    s.Endpoint,
-		Handler: s.r,
+		Handler: handler,
 	}
 	return s
 }

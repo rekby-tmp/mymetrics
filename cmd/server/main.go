@@ -8,6 +8,7 @@ import (
 
 	"github.com/caarlos0/env"
 	"github.com/rekby-tmp/mymetrics/internal/server"
+	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -15,6 +16,11 @@ type Config struct {
 }
 
 func main() {
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		log.Fatalf("failed initialize logger: %v", err)
+	}
+
 	var cfg Config
 	flag.StringVar(&cfg.Endpoint, "a", "localhost:8080", "Endpoint")
 	flag.Parse()
@@ -23,9 +29,9 @@ func main() {
 		log.Fatalf("Failed parse env variables: %v", err)
 	}
 
-	log.Printf("Start server with config: %#v\n", cfg)
-	s := server.NewServer(cfg.Endpoint, server.NewMemStorage())
-	err := s.Start()
+	logger.Info("Start server", zap.Reflect("config", cfg))
+	s := server.NewServer(cfg.Endpoint, server.NewMemStorage(), logger)
+	err = s.Start()
 	if !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
