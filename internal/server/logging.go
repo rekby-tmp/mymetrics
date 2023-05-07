@@ -21,6 +21,7 @@ func (w *ResponseWriterWithStat) Write(b []byte) (int, error) {
 
 func (w *ResponseWriterWithStat) WriteHeader(statusCode int) {
 	w.StatusCode = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
 }
 
 func WithLogging(logger *zap.Logger, h http.Handler) http.Handler {
