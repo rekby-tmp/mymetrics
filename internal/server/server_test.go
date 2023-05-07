@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest"
 )
 
 func TestResponseCodes(t *testing.T) {
@@ -89,7 +90,7 @@ func TestResponseCodes(t *testing.T) {
 			_ = storage.Store("test-counter", MetricTypeCounter, "1")
 			_ = storage.Store("test-gauge", MetricTypeGauge, "2.5")
 
-			server := NewServer("", storage)
+			server := NewServer("", storage, zaptest.NewLogger(t))
 
 			require.True(t, strings.HasPrefix(test.path, "/"))
 
@@ -107,7 +108,7 @@ func TestResponseCodes(t *testing.T) {
 
 func TestSaveValues(t *testing.T) {
 	storage := NewMemStorage()
-	s := NewServer("", storage)
+	s := NewServer("", storage, zaptest.NewLogger(t))
 
 	t.Run("counter", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/update/counter/test1/123", nil)
@@ -126,7 +127,7 @@ func TestGetValues(t *testing.T) {
 	storage := NewMemStorage()
 	require.NoError(t, storage.Store("test-counter", MetricTypeCounter, "1"))
 	require.NoError(t, storage.Store("test-gauge", MetricTypeGauge, "1.5"))
-	s := NewServer("", storage)
+	s := NewServer("", storage, zaptest.NewLogger(t))
 
 	t.Run("counter", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/value/counter/test-counter", nil)
