@@ -2,7 +2,7 @@ package server
 
 import (
 	"fmt"
-	"strconv"
+	"reflect"
 )
 
 type MemStorage struct {
@@ -17,7 +17,7 @@ func NewMemStorage() *MemStorage {
 	}
 }
 
-func (m *MemStorage) Get(name string, metricType MetricType) (value string, err error) {
+func (m *MemStorage) Get(name string, metricType MetricType) (value any, err error) {
 	var val any
 	var ok bool
 	switch metricType {
@@ -26,13 +26,13 @@ func (m *MemStorage) Get(name string, metricType MetricType) (value string, err 
 	case MetricTypeGauge:
 		val, ok = m.gauge[name]
 	default:
-		return "", fmt.Errorf("failed to get metric type %q/%q: %w", metricType, name, errUnknownMetricType)
+		return nil, fmt.Errorf("failed to get metric type %q/%q: %w", metricType, name, ErrUnknownMetricType)
 	}
 
 	if !ok {
-		return "", fmt.Errorf("failed to get metric value %q/%q: %w", metricType, name, errNotFound)
+		return "", fmt.Errorf("failed to get metric value %q/%q: %w", metricType, name, ErrNotFound)
 	}
-	return fmt.Sprint(val), nil
+	return val, nil
 }
 
 func (m *MemStorage) List() (map[MetricType][]string, error) {
@@ -52,22 +52,22 @@ func (m *MemStorage) List() (map[MetricType][]string, error) {
 	}, nil
 }
 
-func (m *MemStorage) Store(name string, metricType MetricType, value string) error {
+func (m *MemStorage) Store(name string, metricType MetricType, value any) error {
 	switch metricType {
 	case MetricTypeCounter:
-		val, err := strconv.ParseInt(value, 10, 64)
-		if err != nil {
-			return fmt.Errorf("failed to parse counter value %q %q: %w", name, value, errBadValue)
+		val, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("bad value type. Need int64, has: %q", reflect.TypeOf(value).String())
 		}
 		m.counter[name] += val
 	case MetricTypeGauge:
-		val, err := strconv.ParseFloat(value, 64)
-		if err != nil {
-			return fmt.Errorf("failed to parse gauge value %q %q: %w", name, value, errBadValue)
+		val, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("bad value type. Need float64, has: %q", reflect.TypeOf(value).String())
 		}
 		m.gauge[name] = val
 	default:
-		return fmt.Errorf("failed to store %q/%q: %w", name, metricType, errUnknownMetricType)
+		return fmt.Errorf("failed to store %q/%q: %w", name, metricType, ErrUnknownMetricType)
 	}
 
 	return nil
