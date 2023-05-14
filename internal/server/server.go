@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,11 +15,12 @@ import (
 )
 
 type Server struct {
-	Endpoint string
-	storage  Storage
-	r        *chi.Mux
-	server   *http.Server
-	logger   *zap.Logger
+	Endpoint           string
+	DBConnectionString string
+	storage            Storage
+	r                  *chi.Mux
+	server             *http.Server
+	logger             *zap.Logger
 }
 
 func NewServer(endpoint string, storage Storage, logger *zap.Logger) *Server {
@@ -33,6 +35,7 @@ func NewServer(endpoint string, storage Storage, logger *zap.Logger) *Server {
 	s.r.Post("/update/{valType}/{name}/{value}", s.updateMetric)
 	s.r.Post("/value/", s.getValueJson)
 	s.r.Get("/value/{valType}/{name}", s.getMetric)
+	s.r.Get("/ping", s.ping)
 
 	var handler http.Handler = s.r
 	handler = WithLogging(logger, handler)
@@ -240,4 +243,22 @@ func (s *Server) getValueJson(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to encode result", http.StatusInternalServerError)
 		return
 	}
+}
+
+func (s *Server) ping(w http.ResponseWriter, r *http.Request) {
+	db, err := sql.Open("postgres", s.DBConnectionString)
+	if err != nil {
+		s.logger.Warn("failed open db connection", zap.Error(err))
+		http.Error(w, "failed open db connection", http.StatusInternalServerError)
+		return
+	}
+
+	err = db.PingContext(r.Context())
+	if err != nil {
+		s.logger.Warn("failed ping db connection", zap.Error(err))
+		http.Error(w, "failed ping db connection", http.StatusInternalServerError)
+		return
+	}
+
+	_, _ = io.WriteString(w, "OK")
 }
