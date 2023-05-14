@@ -69,13 +69,6 @@ func (m *MemStorage) list() (map[common.MetricType][]string, error) {
 }
 
 func (m *MemStorage) Store(name string, metricType common.MetricType, value any) error {
-	m.m.Lock()
-	defer m.m.Unlock()
-
-	return m.store(name, metricType, value)
-}
-
-func (m *MemStorage) store(name string, metricType common.MetricType, value any) error {
 	_, err := m.StoreAndGet(name, metricType, value)
 	return err
 }
