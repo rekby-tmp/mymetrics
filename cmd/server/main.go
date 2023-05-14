@@ -56,7 +56,7 @@ func main() {
 	}()
 
 	logger.Info("Start server", zap.Reflect("config", cfg))
-	s := server.NewServer(cfg.Endpoint, server.NewMemStorage(), logger)
+	s := server.NewServer(cfg.Endpoint, storage, logger)
 	err = s.Start()
 	if !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
