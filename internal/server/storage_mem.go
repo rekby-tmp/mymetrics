@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/rekby-tmp/mymetrics/internal/common"
 	"reflect"
 )
 
@@ -17,13 +18,13 @@ func NewMemStorage() *MemStorage {
 	}
 }
 
-func (m *MemStorage) Get(name string, metricType MetricType) (value any, err error) {
+func (m *MemStorage) Get(name string, metricType common.MetricType) (value any, err error) {
 	var val any
 	var ok bool
 	switch metricType {
-	case MetricTypeCounter:
+	case common.MetricTypeCounter:
 		val, ok = m.counter[name]
-	case MetricTypeGauge:
+	case common.MetricTypeGauge:
 		val, ok = m.gauge[name]
 	default:
 		return nil, fmt.Errorf("failed to get metric type %q/%q: %w", metricType, name, ErrUnknownMetricType)
@@ -35,7 +36,7 @@ func (m *MemStorage) Get(name string, metricType MetricType) (value any, err err
 	return val, nil
 }
 
-func (m *MemStorage) List() (map[MetricType][]string, error) {
+func (m *MemStorage) List() (map[common.MetricType][]string, error) {
 	counters := make([]string, len(m.counter))
 	for name := range m.counter {
 		counters = append(counters, name)
@@ -46,21 +47,21 @@ func (m *MemStorage) List() (map[MetricType][]string, error) {
 		gauges = append(gauges, name)
 	}
 
-	return map[MetricType][]string{
-		MetricTypeCounter: counters,
-		MetricTypeGauge:   gauges,
+	return map[common.MetricType][]string{
+		common.MetricTypeCounter: counters,
+		common.MetricTypeGauge:   gauges,
 	}, nil
 }
 
-func (m *MemStorage) Store(name string, metricType MetricType, value any) error {
+func (m *MemStorage) Store(name string, metricType common.MetricType, value any) error {
 	switch metricType {
-	case MetricTypeCounter:
+	case common.MetricTypeCounter:
 		val, ok := value.(int64)
 		if !ok {
 			return fmt.Errorf("bad value type. Need int64, has: %q", reflect.TypeOf(value).String())
 		}
 		m.counter[name] += val
-	case MetricTypeGauge:
+	case common.MetricTypeGauge:
 		val, ok := value.(float64)
 		if !ok {
 			return fmt.Errorf("bad value type. Need float64, has: %q", reflect.TypeOf(value).String())

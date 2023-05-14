@@ -15,12 +15,6 @@ import (
 	"time"
 )
 
-type MetricType string
-
-func (mt MetricType) String() string {
-	return string(mt)
-}
-
 type Agent struct {
 	server       string
 	pollInterval time.Duration
@@ -122,16 +116,16 @@ func (a *Agent) Send(ctx context.Context) error {
 }
 
 func (a *Agent) sendValue(ctx context.Context, name string, value Metric) error {
-	val := common.Metrics{
+	val := common.Metric{
 		ID:    name,
-		MType: value.Type().String(),
+		MType: value.Type(),
 	}
 
 	switch value.Type() {
-	case MetricTypeCounter:
+	case common.MetricTypeCounter:
 		v := value.Value().(int64)
 		val.Delta = &v
-	case MetricTypeGauge:
+	case common.MetricTypeGauge:
 		v := value.Value().(float64)
 		val.Value = &v
 	default:

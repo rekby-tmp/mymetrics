@@ -28,7 +28,7 @@ func TestMetricAddress(t *testing.T) {
 
 func TestSend(t *testing.T) {
 	var m sync.Mutex
-	var values []common.Metrics
+	var values []common.Metric
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
 
@@ -38,7 +38,7 @@ func TestSend(t *testing.T) {
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 
-		var val common.Metrics
+		var val common.Metric
 		err = json.Unmarshal(body, &val)
 		require.NoError(t, err)
 		values = append(values, val)
@@ -59,7 +59,7 @@ func TestSend(t *testing.T) {
 	sort.Slice(values, func(i, j int) bool {
 		return values[i].ID < values[j].ID
 	})
-	require.Equal(t, []common.Metrics{
+	require.Equal(t, []common.Metric{
 		{
 			ID:    "a",
 			MType: "counter",

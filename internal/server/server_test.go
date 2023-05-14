@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/rekby-tmp/mymetrics/internal/common"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -121,8 +122,8 @@ func TestResponseCodes(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			storage := NewMemStorage()
-			_ = storage.Store("test-counter", MetricTypeCounter, int64(1))
-			_ = storage.Store("test-gauge", MetricTypeGauge, float64(2.5))
+			_ = storage.Store("test-counter", common.MetricTypeCounter, int64(1))
+			_ = storage.Store("test-gauge", common.MetricTypeGauge, float64(2.5))
 
 			server := NewServer("", storage, zaptest.NewLogger(t))
 
@@ -162,8 +163,8 @@ func TestSaveValuesWithURL(t *testing.T) {
 
 func TestGetValuesWithURL(t *testing.T) {
 	storage := NewMemStorage()
-	require.NoError(t, storage.Store("test-counter", MetricTypeCounter, int64(1)))
-	require.NoError(t, storage.Store("test-gauge", MetricTypeGauge, float64(1.5)))
+	require.NoError(t, storage.Store("test-counter", common.MetricTypeCounter, int64(1)))
+	require.NoError(t, storage.Store("test-gauge", common.MetricTypeGauge, float64(1.5)))
 	s := NewServer("", storage, zaptest.NewLogger(t))
 
 	t.Run("counter", func(t *testing.T) {
@@ -187,8 +188,8 @@ func TestGetListMetricts(t *testing.T) {
 	e := New(t)
 	server := TestServer(e)
 	storage := TestStorage(e)
-	_ = storage.Store("test-counter-metric", MetricTypeCounter, int64(1))
-	_ = storage.Store("test-gauge-metric", MetricTypeGauge, float64(2))
+	_ = storage.Store("test-counter-metric", common.MetricTypeCounter, int64(1))
+	_ = storage.Store("test-gauge-metric", common.MetricTypeGauge, float64(2))
 
 	resp := ServerGetResponse(t, server, "/")
 	require.Contains(t, resp, "test-counter-metric")
@@ -208,7 +209,7 @@ func TestUpdateMetricJson(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 
 		storage := TestStorage(e)
-		res, err := storage.Get("counter-test", MetricTypeCounter)
+		res, err := storage.Get("counter-test", common.MetricTypeCounter)
 		require.NoError(t, err)
 		require.Equal(t, int64(2), res)
 	})
@@ -224,7 +225,7 @@ func TestUpdateMetricJson(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 
 		storage := TestStorage(e)
-		res, err := storage.Get("gauge-test", MetricTypeGauge)
+		res, err := storage.Get("gauge-test", common.MetricTypeGauge)
 		require.NoError(t, err)
 		require.Equal(t, float64(5), res)
 	})
@@ -233,7 +234,7 @@ func TestUpdateMetricJson(t *testing.T) {
 func TestGetJson(t *testing.T) {
 	t.Run("counter", func(t *testing.T) {
 		e := New(t)
-		require.NoError(t, TestStorage(e).Store("test-counter", MetricTypeCounter, int64(3)))
+		require.NoError(t, TestStorage(e).Store("test-counter", common.MetricTypeCounter, int64(3)))
 		resp, err := http.Post("http://"+TestServer(e).Endpoint+"/value/", "application/json", strings.NewReader(`
 {
 	"id": "test-counter",
@@ -256,7 +257,7 @@ func TestGetJson(t *testing.T) {
 	})
 	t.Run("gauge", func(t *testing.T) {
 		e := New(t)
-		require.NoError(t, TestStorage(e).Store("test-gauge", MetricTypeGauge, float64(5)))
+		require.NoError(t, TestStorage(e).Store("test-gauge", common.MetricTypeGauge, float64(5)))
 		resp, err := http.Post("http://"+TestServer(e).Endpoint+"/value/", "application/json", strings.NewReader(`
 {
 	"id": "test-gauge",

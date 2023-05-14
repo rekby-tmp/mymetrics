@@ -1,24 +1,20 @@
 package agent
 
 import (
+	"github.com/rekby-tmp/mymetrics/internal/common"
 	"strconv"
-)
-
-const (
-	MetricTypeCounter MetricType = "counter"
-	MetricTypeGauge   MetricType = "gauge"
 )
 
 type Metric interface {
 	String() string
-	Type() MetricType
+	Type() common.MetricType
 	Value() any
 }
 
 type MetricCounter int64
 
-func (c MetricCounter) Type() MetricType {
-	return MetricTypeCounter
+func (c MetricCounter) Type() common.MetricType {
+	return common.MetricTypeCounter
 }
 
 func (c MetricCounter) String() string {
@@ -31,8 +27,8 @@ func (c MetricCounter) Value() any {
 
 type MetricGauge float64
 
-func (g MetricGauge) Type() MetricType {
-	return MetricTypeGauge
+func (g MetricGauge) Type() common.MetricType {
+	return common.MetricTypeGauge
 }
 
 func (g MetricGauge) String() string {

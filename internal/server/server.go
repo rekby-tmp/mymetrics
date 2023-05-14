@@ -56,7 +56,7 @@ func (s *Server) getMetric(w http.ResponseWriter, r *http.Request) {
 	valType := chi.URLParam(r, "valType")
 	name := chi.URLParam(r, "name")
 
-	res, err := s.storage.Get(name, MetricType(valType))
+	res, err := s.storage.Get(name, common.MetricType(valType))
 	switch {
 	case errors.Is(err, ErrUnknownMetricType):
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -74,7 +74,7 @@ func (s *Server) getMetric(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.WriteString(w, fmt.Sprint(res))
 }
 
-func (s *Server) listMetrics(w http.ResponseWriter, r *http.Request) {
+func (s *Server) listMetrics(w http.ResponseWriter, _ *http.Request) {
 	list, err := s.storage.List()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -102,14 +102,14 @@ func (s *Server) updateMetric(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	valS := chi.URLParam(r, "value")
 
-	val, err := ParseMetricValue(MetricType(valType), valS)
+	val, err := ParseMetricValue(common.MetricType(valType), valS)
 	switch {
 	case errors.Is(err, ErrUnknownMetricType):
 		// pass
 	case err != nil:
 		err = fmt.Errorf("failed to parse value %q: %w", err, ErrBadValue)
 	default:
-		err = s.storage.Store(name, MetricType(valType), val)
+		err = s.storage.Store(name, common.MetricType(valType), val)
 	}
 
 	switch {
@@ -131,26 +131,30 @@ func (s *Server) updateJson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var m common.Metrics
+	var m common.Metric
 	err := json.NewDecoder(r.Body).Decode(&m)
 	if err != nil {
 		s.logger.Warn("failed to read request content", zap.Error(err))
 		http.Error(w, "failed to read request content", http.StatusInternalServerError)
 	}
 
-	switch MetricType(m.MType) {
-	case MetricTypeCounter:
+	switch common.MetricType(m.MType) {
+	case common.MetricTypeCounter:
 		if m.Delta == nil {
 			http.Error(w, "data has no Delta value", http.StatusBadRequest)
 			return
 		}
-		err = s.storage.Store(m.ID, MetricTypeCounter, *m.Delta)
-	case MetricTypeGauge:
+		err = s.storage.Store(m.ID, common.MetricTypeCounter, *m.Delta)
+	case common.MetricTypeGauge:
 		if m.Value == nil {
 			http.Error(w, "data has no Value value", http.StatusBadRequest)
 			return
 		}
-		err = s.storage.Store(m.ID, MetricTypeGauge, *m.Value)
+		err = s.storage.Store(m.ID, common.MetricTypeGauge, *m.Value)
+	default:
+		s.logger.Warn("unknown metric type", zap.Stringer("metric_type", m.MType))
+		http.Error(w, "unknown metric type", http.StatusBadRequest)
+		return
 	}
 	if err != nil {
 		s.logger.Error("failed to store value", zap.Error(err))
@@ -164,7 +168,7 @@ func (s *Server) getValueJson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var m common.Metrics
+	var m common.Metric
 	err := json.NewDecoder(r.Body).Decode(&m)
 	if err != nil {
 		s.logger.Warn("failed to read request content", zap.Error(err))
@@ -177,45 +181,45 @@ func (s *Server) getValueJson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mType := MetricType(m.MType)
+	mType := common.MetricType(m.MType)
 	val, err := s.storage.Get(m.ID, mType)
 	switch {
 	case errors.Is(err, ErrUnknownMetricType):
-		s.logger.Warn("unknown metric type", zap.String("metric_type", m.MType))
+		s.logger.Warn("unknown metric type", zap.Stringer("metric_type", m.MType))
 		http.Error(w, "bad metric type", http.StatusBadRequest)
 		return
 	case errors.Is(err, ErrNotFound):
-		s.logger.Warn("metric not found", zap.String("metric_type", m.MType), zap.String("name", m.ID))
+		s.logger.Warn("metric not found", zap.Stringer("metric_type", m.MType), zap.String("name", m.ID))
 		http.Error(w, "metric not found", http.StatusNotFound)
 		return
 	case err != nil:
-		s.logger.Warn("fail to get metric", zap.String("metric_type", m.MType), zap.String("name", m.ID), zap.Error(err))
+		s.logger.Warn("fail to get metric", zap.Stringer("metric_type", m.MType), zap.String("name", m.ID), zap.Error(err))
 		http.Error(w, "fail to get metric", http.StatusInternalServerError)
 		return
 	default:
 		// pass
 	}
 
-	res := common.Metrics{
+	res := common.Metric{
 		ID:    m.ID,
 		MType: m.MType,
 	}
 	switch mType {
-	case MetricTypeCounter:
+	case common.MetricTypeCounter:
 		val := val.(int64)
 		res.Delta = &val
-	case MetricTypeGauge:
+	case common.MetricTypeGauge:
 		val := val.(float64)
 		res.Value = &val
 	default:
-		s.logger.Error("unexpected metric type", zap.String("metric_type", m.MType), zap.String("name", m.ID))
+		s.logger.Error("unexpected metric type", zap.Stringer("metric_type", m.MType), zap.String("name", m.ID))
 		http.Error(w, "unexpected metric type", http.StatusInternalServerError)
 		return
 	}
 
 	err = json.NewEncoder(w).Encode(res)
 	if err != nil {
-		s.logger.Error("failed to encode result", zap.String("metric_type", m.MType), zap.String("name", m.ID), zap.Error(err))
+		s.logger.Error("failed to encode result", zap.Stringer("metric_type", m.MType), zap.String("name", m.ID), zap.Error(err))
 		http.Error(w, "failed to encode result", http.StatusInternalServerError)
 		return
 	}
