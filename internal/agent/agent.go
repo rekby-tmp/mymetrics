@@ -1,8 +1,11 @@
 package agent
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/rekby-tmp/mymetrics/internal/common"
 	"io"
 	"log"
 	"math/rand"
@@ -13,6 +16,10 @@ import (
 )
 
 type MetricType string
+
+func (mt MetricType) String() string {
+	return string(mt)
+}
 
 type Agent struct {
 	server       string
@@ -115,11 +122,33 @@ func (a *Agent) Send(ctx context.Context) error {
 }
 
 func (a *Agent) sendValue(ctx context.Context, name string, value Metric) error {
-	address := a.makeURL(name, value)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, address, nil)
+	val := common.Metrics{
+		ID:    name,
+		MType: value.Type().String(),
+	}
+
+	switch value.Type() {
+	case MetricTypeCounter:
+		v := value.Value().(int64)
+		val.Delta = &v
+	case MetricTypeGauge:
+		v := value.Value().(float64)
+		val.Value = &v
+	default:
+		return fmt.Errorf("unknown metric type: %q", value.Type().String())
+	}
+
+	content, err := json.Marshal(val)
+	if err != nil {
+		return fmt.Errorf("failed marshal value: %w", err)
+	}
+
+	address := a.server + "/update/"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, address, bytes.NewReader(content))
 	if err != nil {
 		return fmt.Errorf("failed create http request for send metric: %w", err)
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {

@@ -138,7 +138,7 @@ func TestResponseCodes(t *testing.T) {
 
 			resp := respRec.Result()
 			require.Equal(t, test.respCode, resp.StatusCode)
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		})
 	}
 }

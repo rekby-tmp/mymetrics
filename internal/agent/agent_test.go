@@ -2,6 +2,9 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/rekby-tmp/mymetrics/internal/common"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sort"
@@ -25,14 +28,20 @@ func TestMetricAddress(t *testing.T) {
 
 func TestSend(t *testing.T) {
 	var m sync.Mutex
-	var values []string
+	var values []common.Metrics
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
 
 		m.Lock()
 		defer m.Unlock()
 
-		values = append(values, r.URL.Path)
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+
+		var val common.Metrics
+		err = json.Unmarshal(body, &val)
+		require.NoError(t, err)
+		values = append(values, val)
 	}))
 
 	a := &Agent{
@@ -47,9 +56,21 @@ func TestSend(t *testing.T) {
 	err := a.Send(context.Background())
 	require.NoError(t, err)
 
-	sort.Strings(values)
-	require.Equal(t, []string{
-		"/update/counter/a/1",
-		"/update/gauge/b/2",
+	sort.Slice(values, func(i, j int) bool {
+		return values[i].ID < values[j].ID
+	})
+	require.Equal(t, []common.Metrics{
+		{
+			ID:    "a",
+			MType: "counter",
+			Delta: &(&[1]int64{1})[0],
+			Value: nil,
+		},
+		{
+			ID:    "b",
+			MType: "gauge",
+			Delta: nil,
+			Value: &(&[1]float64{2})[0],
+		},
 	}, values)
 }
