@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/caarlos0/env"
@@ -23,6 +24,12 @@ type Config struct {
 }
 
 func main() {
+	// WORKAROUNDS
+	// Increment 10, cut s from value 10s
+	if v := os.Getenv("STORE_INTERVAL"); strings.HasSuffix(v, "s") {
+		_ = os.Setenv("STORE_INTERVAL", v[:len(v)-1])
+	}
+
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		log.Fatalf("failed initialize logger: %v", err)
