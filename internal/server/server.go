@@ -36,6 +36,8 @@ func NewServer(endpoint string, storage Storage, logger *zap.Logger) *Server {
 
 	var handler http.Handler = s.r
 	handler = WithLogging(logger, handler)
+	handler = WithGzipResponse(logger, handler)
+	handler = WithGzipRequest(logger, handler)
 
 	s.server = &http.Server{
 		Addr:    s.Endpoint,
@@ -84,14 +86,16 @@ func (s *Server) listMetrics(w http.ResponseWriter, _ *http.Request) {
 	buf := &bytes.Buffer{}
 	for t, names := range list {
 		_, _ = buf.WriteString(string(t))
-		_, _ = buf.WriteString(":\n")
+		_, _ = buf.WriteString(":<br />\n")
 
 		for _, name := range names {
 			_, _ = buf.WriteString(name)
-			_ = buf.WriteByte('\n')
+			_, _ = buf.WriteString("<br />\n")
 		}
-		_ = buf.WriteByte('\n')
+		_, _ = buf.WriteString("<br />\n")
 	}
+
+	w.Header().Set("Content-Type", common.HtmlType)
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, buf)

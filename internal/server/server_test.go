@@ -1,6 +1,8 @@
 package server
 
 import (
+	"bytes"
+	"compress/gzip"
 	"github.com/rekby-tmp/mymetrics/internal/common"
 	"io"
 	"net/http"
@@ -290,4 +292,96 @@ func TestGetJson(t *testing.T) {
 }
 `, string(content))
 	})
+}
+
+func TestGzipReponse(t *testing.T) {
+	t.Run("html", func(t *testing.T) {
+		e := New(t)
+		server := TestServer(e)
+		require.NoError(t, TestStorage(e).Store("test-counter", common.MetricTypeCounter, int64(2)))
+		req, err := http.NewRequest(http.MethodGet, "http://"+server.Endpoint, nil)
+		require.NoError(t, err)
+		req.Header.Set("Accept-Encoding", "gzip")
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, "gzip", resp.Header.Get("Content-Encoding"))
+
+		bodyReader, err := gzip.NewReader(resp.Body)
+		require.NoError(t, err)
+
+		body, err := io.ReadAll(bodyReader)
+		require.NoError(t, err)
+		require.Contains(t, string(body), "test-counter")
+	})
+	t.Run("json", func(t *testing.T) {
+		e := New(t)
+		require.NoError(t, TestStorage(e).Store("test-counter", common.MetricTypeCounter, int64(3)))
+		req, err := http.NewRequest(
+			http.MethodPost,
+			"http://"+TestServer(e).Endpoint+"/value/",
+			strings.NewReader(`{"id": "test-counter","type": "counter"}`),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", common.JsonType)
+		req.Header.Set("Accept-Encoding", common.GzipEncoding)
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, common.JsonType, resp.Header.Get("Content-Type"))
+
+		contentReader, err := gzip.NewReader(resp.Body)
+		require.NoError(t, err)
+
+		content, err := io.ReadAll(contentReader)
+		require.NoError(t, err)
+
+		_ = resp.Body.Close()
+		require.JSONEq(t, `
+{
+	"id": "test-counter",
+	"type": "counter",
+	"delta": 3
+}
+`, string(content))
+	})
+}
+
+func TestGzipRequest(t *testing.T) {
+	e := New(t)
+	require.NoError(t, TestStorage(e).Store("test-counter", common.MetricTypeCounter, int64(3)))
+
+	gzipBuf := &bytes.Buffer{}
+	gzipWriter := gzip.NewWriter(gzipBuf)
+	_, _ = io.WriteString(gzipWriter, `{"id": "test-counter","type": "counter"}`)
+	_ = gzipWriter.Close()
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		"http://"+TestServer(e).Endpoint+"/value/",
+		gzipBuf,
+	)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", common.JsonType)
+	req.Header.Set("Content-Encoding", common.GzipEncoding)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, common.JsonType, resp.Header.Get("Content-Type"))
+
+	content, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	_ = resp.Body.Close()
+	require.JSONEq(t, `
+{
+	"id": "test-counter",
+	"type": "counter",
+	"delta": 3
+}
+`,
+		string(content))
 }

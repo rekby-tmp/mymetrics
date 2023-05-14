@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"github.com/rekby-tmp/mymetrics/internal/common"
@@ -31,11 +32,14 @@ func TestSend(t *testing.T) {
 	var values []common.Metric
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, common.GzipEncoding, r.Header.Get("Content-Encoding"))
 
 		m.Lock()
 		defer m.Unlock()
 
-		body, err := io.ReadAll(r.Body)
+		bodyReader, err := gzip.NewReader(r.Body)
+		require.NoError(t, err)
+		body, err := io.ReadAll(bodyReader)
 		require.NoError(t, err)
 
 		var val common.Metric
