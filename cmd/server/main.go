@@ -30,6 +30,13 @@ func main() {
 		_ = os.Setenv("STORE_INTERVAL", v[:len(v)-1])
 	}
 
+	// Increment 10, -d arg
+	for index, arg := range os.Args {
+		if strings.HasPrefix(arg, "-d") && !strings.HasPrefix(arg, "-d=") {
+			os.Args[index] = "-d=" + arg[2:]
+		}
+	}
+
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		log.Fatalf("failed initialize logger: %v", err)
