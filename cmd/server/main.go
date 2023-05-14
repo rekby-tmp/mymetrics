@@ -5,6 +5,8 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/caarlos0/env"
 	"github.com/rekby-tmp/mymetrics/internal/server"
@@ -12,7 +14,10 @@ import (
 )
 
 type Config struct {
-	Endpoint string `env:"ADDRESS"`
+	Endpoint      string `env:"ADDRESS"`
+	StoreInterval int    `env:"STORE_INTERVAL"`
+	StorePath     string `env:"FILE_STORAGE_PATH"`
+	Restore       bool   `env:"RESTORE"`
 }
 
 func main() {
@@ -23,11 +28,32 @@ func main() {
 
 	var cfg Config
 	flag.StringVar(&cfg.Endpoint, "a", "localhost:8080", "Endpoint")
+	flag.IntVar(&cfg.StoreInterval, "i", 300, "Store interval, seconds")
+	flag.StringVar(&cfg.StorePath, "f", "/tmp/metrics-db.json", "Storage path")
+	flag.BoolVar(&cfg.Restore, "r", true, "Restore state from storage path")
 	flag.Parse()
 
 	if err := env.Parse(&cfg); err != nil {
 		log.Fatalf("Failed parse env variables: %v", err)
 	}
+
+	logger.Info("Init storage")
+	storage := server.NewFileStorage(cfg.StorePath, time.Duration(cfg.StoreInterval)*time.Second)
+	if cfg.Restore {
+		if _, err := os.Stat(cfg.StorePath); !os.IsNotExist(err) {
+			err = storage.LoadFromFile(cfg.StorePath)
+			if err != nil {
+				log.Fatalf("failed load old state from file %q: %+v", cfg.StorePath, err)
+			}
+		}
+	}
+	defer func() {
+		err := storage.Flush()
+		if err != nil {
+			log.Fatalf("failed to flush storage on exit to file %q: %+v", cfg.StorePath, err)
+		}
+		_ = storage.Close()
+	}()
 
 	logger.Info("Start server", zap.Reflect("config", cfg))
 	s := server.NewServer(cfg.Endpoint, server.NewMemStorage(), logger)

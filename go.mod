@@ -3,8 +3,7 @@ module github.com/rekby-tmp/mymetrics
 go 1.20
 
 require (
-	github.com/gin-gonic/gin v1.9.0
-	github.com/rekby/fixenv v0.5.2
+	github.com/rekby/fixenv v0.5.3
 )
 
 require (
