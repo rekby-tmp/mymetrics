@@ -252,6 +252,7 @@ func (s *Server) ping(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed open db connection", http.StatusInternalServerError)
 		return
 	}
+	defer func() { _ = db.Close() }()
 
 	err = db.PingContext(r.Context())
 	if err != nil {
