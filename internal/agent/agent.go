@@ -142,7 +142,7 @@ func (a *Agent) sendValue(ctx context.Context, name string, value Metric) error 
 	if err != nil {
 		return fmt.Errorf("failed create http request for send metric: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", common.JsonType)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {

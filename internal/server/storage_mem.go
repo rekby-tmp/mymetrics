@@ -54,22 +54,29 @@ func (m *MemStorage) List() (map[common.MetricType][]string, error) {
 }
 
 func (m *MemStorage) Store(name string, metricType common.MetricType, value any) error {
+	_, err := m.StoreAndGet(name, metricType, value)
+	return err
+}
+
+func (m *MemStorage) StoreAndGet(name string, metricType common.MetricType, value any) (newVal any, _ error) {
 	switch metricType {
 	case common.MetricTypeCounter:
 		val, ok := value.(int64)
 		if !ok {
-			return fmt.Errorf("bad value type. Need int64, has: %q", reflect.TypeOf(value).String())
+			return nil, fmt.Errorf("bad value type. Need int64, has: %q", reflect.TypeOf(value).String())
 		}
 		m.counter[name] += val
+		newVal = m.counter[name]
 	case common.MetricTypeGauge:
 		val, ok := value.(float64)
 		if !ok {
-			return fmt.Errorf("bad value type. Need float64, has: %q", reflect.TypeOf(value).String())
+			return nil, fmt.Errorf("bad value type. Need float64, has: %q", reflect.TypeOf(value).String())
 		}
 		m.gauge[name] = val
+		newVal = val
 	default:
-		return fmt.Errorf("failed to store %q/%q: %w", name, metricType, ErrUnknownMetricType)
+		return nil, fmt.Errorf("failed to store %q/%q: %w", name, metricType, ErrUnknownMetricType)
 	}
 
-	return nil
+	return newVal, nil
 }

@@ -20,6 +20,9 @@ type Storage interface {
 	// Store - save value.
 	// val - int64 for counter value and float64 for gauge
 	Store(name string, metricType common.MetricType, val any) (err error)
+
+	// StoreAndGet store value and return updated value
+	StoreAndGet(name string, metricType common.MetricType, val any) (newVal any, err error)
 }
 
 func ParseMetricValue(m common.MetricType, val string) (res any, err error) {

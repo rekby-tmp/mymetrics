@@ -126,8 +126,8 @@ func (s *Server) updateMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) updateJson(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("Content-Type") != "application/json" {
-		http.Error(w, "Accept application/json content type only", http.StatusBadRequest)
+	if r.Header.Get("Content-Type") != common.JsonType {
+		http.Error(w, "Accept "+common.JsonType+" content type only", http.StatusBadRequest)
 		return
 	}
 
@@ -138,33 +138,45 @@ func (s *Server) updateJson(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to read request content", http.StatusInternalServerError)
 	}
 
-	switch common.MetricType(m.MType) {
+	var storeErr error
+	switch m.MType {
 	case common.MetricTypeCounter:
 		if m.Delta == nil {
 			http.Error(w, "data has no Delta value", http.StatusBadRequest)
 			return
 		}
-		err = s.storage.Store(m.ID, common.MetricTypeCounter, *m.Delta)
+		var newVal any
+		newVal, storeErr = s.storage.StoreAndGet(m.ID, common.MetricTypeCounter, *m.Delta)
+		m.Delta = &(&[1]int64{newVal.(int64)})[0]
 	case common.MetricTypeGauge:
 		if m.Value == nil {
 			http.Error(w, "data has no Value value", http.StatusBadRequest)
 			return
 		}
-		err = s.storage.Store(m.ID, common.MetricTypeGauge, *m.Value)
+		var newVal any
+		newVal, storeErr = s.storage.StoreAndGet(m.ID, common.MetricTypeGauge, *m.Value)
+		m.Value = &(&[1]float64{newVal.(float64)})[0]
 	default:
 		s.logger.Warn("unknown metric type", zap.Stringer("metric_type", m.MType))
 		http.Error(w, "unknown metric type", http.StatusBadRequest)
 		return
 	}
+	if storeErr != nil {
+		s.logger.Error("failed to store value", zap.Error(storeErr))
+		http.Error(w, "failed store value", http.StatusInternalServerError)
+	}
+
+	w.Header().Set("Content-Type", common.JsonType)
+	err = json.NewEncoder(w).Encode(m)
 	if err != nil {
-		s.logger.Error("failed to store value", zap.Error(err))
+		s.logger.Error("failed to encore json response", zap.Error(err))
 		http.Error(w, "failed store value", http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) getValueJson(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("Content-Type") != "application/json" {
-		http.Error(w, "Accept application/json content type only", http.StatusBadRequest)
+	if r.Header.Get("Content-Type") != common.JsonType {
+		http.Error(w, "Accept "+common.JsonType+" content type only", http.StatusBadRequest)
 		return
 	}
 
@@ -217,6 +229,7 @@ func (s *Server) getValueJson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", common.JsonType)
 	err = json.NewEncoder(w).Encode(res)
 	if err != nil {
 		s.logger.Error("failed to encode result", zap.Stringer("metric_type", m.MType), zap.String("name", m.ID), zap.Error(err))

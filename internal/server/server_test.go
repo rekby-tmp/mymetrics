@@ -131,7 +131,7 @@ func TestResponseCodes(t *testing.T) {
 
 			req := httptest.NewRequest(test.method, "http://localhost"+test.path, strings.NewReader(test.body))
 			if len(test.body) > 0 {
-				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Content-Type", common.JsonType)
 			}
 			respRec := httptest.NewRecorder()
 
@@ -200,13 +200,18 @@ func TestUpdateMetricJson(t *testing.T) {
 	t.Run("counter", func(t *testing.T) {
 		e := New(t)
 		server := TestServer(e)
-		resp, err := http.Post("http://"+server.Endpoint+"/update/", "application/json", strings.NewReader(`{
+		resp, err := http.Post("http://"+server.Endpoint+"/update/", common.JsonType, strings.NewReader(`{
 "id": "counter-test",
 "type": "counter",
 "delta": 2
 }`))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, common.JsonType, resp.Header.Get("Content-Type"))
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.JSONEq(t, `{"id": "counter-test", "type": "counter", "delta": 2}`, string(body))
 
 		storage := TestStorage(e)
 		res, err := storage.Get("counter-test", common.MetricTypeCounter)
@@ -216,13 +221,18 @@ func TestUpdateMetricJson(t *testing.T) {
 	t.Run("gauge", func(t *testing.T) {
 		e := New(t)
 		server := TestServer(e)
-		resp, err := http.Post("http://"+server.Endpoint+"/update/", "application/json", strings.NewReader(`{
+		resp, err := http.Post("http://"+server.Endpoint+"/update/", common.JsonType, strings.NewReader(`{
 "id": "gauge-test",
 "type": "gauge",
 "value": 5
 }`))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, common.JsonType, resp.Header.Get("Content-Type"))
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.JSONEq(t, `{"id": "gauge-test","type": "gauge","value": 5}`, string(body))
 
 		storage := TestStorage(e)
 		res, err := storage.Get("gauge-test", common.MetricTypeGauge)
@@ -235,7 +245,7 @@ func TestGetJson(t *testing.T) {
 	t.Run("counter", func(t *testing.T) {
 		e := New(t)
 		require.NoError(t, TestStorage(e).Store("test-counter", common.MetricTypeCounter, int64(3)))
-		resp, err := http.Post("http://"+TestServer(e).Endpoint+"/value/", "application/json", strings.NewReader(`
+		resp, err := http.Post("http://"+TestServer(e).Endpoint+"/value/", common.JsonType, strings.NewReader(`
 {
 	"id": "test-counter",
 	"type": "counter"
@@ -243,6 +253,7 @@ func TestGetJson(t *testing.T) {
 `))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, common.JsonType, resp.Header.Get("Content-Type"))
 
 		content, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
@@ -258,7 +269,7 @@ func TestGetJson(t *testing.T) {
 	t.Run("gauge", func(t *testing.T) {
 		e := New(t)
 		require.NoError(t, TestStorage(e).Store("test-gauge", common.MetricTypeGauge, float64(5)))
-		resp, err := http.Post("http://"+TestServer(e).Endpoint+"/value/", "application/json", strings.NewReader(`
+		resp, err := http.Post("http://"+TestServer(e).Endpoint+"/value/", common.JsonType, strings.NewReader(`
 {
 	"id": "test-gauge",
 	"type": "gauge"
@@ -266,6 +277,7 @@ func TestGetJson(t *testing.T) {
 `))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, common.JsonType, resp.Header.Get("Content-Type"))
 
 		content, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
